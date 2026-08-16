@@ -1,0 +1,41 @@
+.gitignore
+*.pyc
+__pycache__/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Project specific
+config.json
+logs/
+output/
+*.log
+*.sqlite
+.env
+
+# Compiled C++
+*.so
+*.dll
+*.dylib
+*.exe
+CMakeFiles/
+cmake_install.cmake
+CMakeCache.txt
+Makefile
+
+# OS specific
+Thumbs.db
+.DS_Store

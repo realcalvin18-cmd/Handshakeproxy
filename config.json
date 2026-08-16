@@ -1,0 +1,33 @@
+{
+  "gologin": {
+    "api_key": "YOUR_GOLOGIN_API_KEY",
+    "profile_id": "YOUR_PROFILE_ID",
+    "headless": false,
+    "timeout": 30000
+  },
+  "nodemaven": {
+    "api_key": "YOUR_NODEMAVEN_API_KEY",
+    "sticky_duration": 86400,
+    "countries": ["US", "UK", "DE"],
+    "ip_type": "residential"
+  },
+  "scraper": {
+    "targets": [],
+    "output_file": "output/scraped_data.json",
+    "retry_attempts": 3,
+    "timeout": 30,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  },
+  "anti_detection": {
+    "randomize_headers": true,
+    "spoof_webrtc": true,
+    "disable_dns_leaks": true,
+    "randomize_request_order": true,
+    "request_delay_min": 1000,
+    "request_delay_max": 5000
+  },
+  "flash_drive": {
+    "auto_save_output": true,
+    "portable_mode": true
+  }
+}
