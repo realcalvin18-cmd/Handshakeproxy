@@ -13,14 +13,49 @@ using json = nlohmann::json;
 
 /**
  * Handshake Proxy - C++ Anti-Detection Network Engine
+ * Location: Houston, Texas (FIXED - doesn't differ)
  * 
  * Provides high-performance network layer for:
  * - TLS fingerprint spoofing
  * - HTTP/2 header manipulation
  * - Request obfuscation
- * - Proxy management
+ * - Proxy management with consistent location
  * - Connection pooling
  */
+
+class LocationConfig {
+private:
+    // FIXED Houston, Texas location
+    std::string city = "Houston";
+    std::string state = "Texas";
+    std::string country = "United States";
+    std::string timezone = "America/Chicago";
+    double latitude = 29.7604;
+    double longitude = -95.3698;
+    
+public:
+    LocationConfig() {}
+    
+    json to_json() const {
+        return json{
+            {"city", city},
+            {"state", state},
+            {"country", country},
+            {"timezone", timezone},
+            {"latitude", latitude},
+            {"longitude", longitude},
+            {"fixed", true},
+            {"consistent", true}
+        };
+    }
+    
+    std::string get_city() const { return city; }
+    std::string get_state() const { return state; }
+    std::string get_country() const { return country; }
+    std::string get_timezone() const { return timezone; }
+    double get_latitude() const { return latitude; }
+    double get_longitude() const { return longitude; }
+};
 
 class TLSFingerprint {
 private:
@@ -28,6 +63,7 @@ private:
     std::string elliptic_curves;
     std::string signature_algorithms;
     std::vector<std::string> supported_versions;
+    LocationConfig location;
     
 public:
     TLSFingerprint() {
@@ -55,6 +91,7 @@ public:
     
     std::string get_cipher_suite() const { return cipher_suite; }
     std::string get_elliptic_curves() const { return elliptic_curves; }
+    LocationConfig get_location() const { return location; }
 };
 
 class ProxyConnection {
@@ -64,6 +101,9 @@ private:
     std::string username;
     std::string password;
     std::string protocol;
+    std::string city;
+    std::string state;
+    std::string country;
     time_t created_at;
     time_t expires_at;
     bool is_active;
@@ -77,6 +117,12 @@ public:
         username = proxy_config.value("username", "");
         password = proxy_config.value("password", "");
         protocol = proxy_config.value("protocol", "http");
+        
+        // FIXED: Houston, Texas location
+        city = proxy_config.value("city", "Houston");
+        state = proxy_config.value("state", "Texas");
+        country = proxy_config.value("country", "US");
+        
         expires_at = created_at + proxy_config.value("expires_in", 86400);
     }
     
@@ -95,8 +141,29 @@ public:
         return is_active && !is_expired();
     }
     
+    bool verify_location() const {
+        // Verify this is Houston, Texas
+        return (city == "Houston" || city == "houston") && 
+               (state == "Texas" || state == "texas");
+    }
+    
     std::string get_ip() const { return ip; }
     int get_port() const { return port; }
+    std::string get_city() const { return city; }
+    std::string get_state() const { return state; }
+    std::string get_country() const { return country; }
+    
+    json get_location_json() const {
+        return json{
+            {"city", city},
+            {"state", state},
+            {"country", country},
+            {"timezone", "America/Chicago"},
+            {"latitude", 29.7604},
+            {"longitude", -95.3698},
+            {"fixed", true}
+        };
+    }
 };
 
 class ConnectionPool {
@@ -111,14 +178,18 @@ public:
     void add_connection(const json& proxy_config) {
         std::lock_guard<std::mutex> lock(pool_mutex);
         if (connections.size() < max_connections) {
-            connections.push_back(std::make_shared<ProxyConnection>(proxy_config));
+            auto conn = std::make_shared<ProxyConnection>(proxy_config);
+            // Verify location before adding
+            if (conn->verify_location()) {
+                connections.push_back(conn);
+            }
         }
     }
     
     std::shared_ptr<ProxyConnection> get_active_connection() {
         std::lock_guard<std::mutex> lock(pool_mutex);
         for (auto& conn : connections) {
-            if (conn->is_valid()) {
+            if (conn->is_valid() && conn->verify_location()) {
                 return conn;
             }
         }
@@ -143,6 +214,7 @@ class AntiDetectionEngine {
 private:
     TLSFingerprint tls_fingerprint;
     std::map<std::string, std::string> header_templates;
+    LocationConfig location;
     
 public:
     AntiDetectionEngine() {
@@ -160,6 +232,7 @@ public:
         header_templates["Sec-Fetch-Site"] = "none";
         header_templates["Sec-Fetch-User"] = "?1";
         header_templates["Upgrade-Insecure-Requests"] = "1";
+        header_templates["X-Location"] = "Houston, Texas";
     }
     
     std::map<std::string, std::string> generate_headers(const std::string& user_agent) {
@@ -167,12 +240,16 @@ public:
         headers["User-Agent"] = user_agent;
         headers["Accept-Language"] = generate_accept_language();
         
-        // Add randomized optional headers
+        // Add randomized optional headers (location is fixed)
         if (rand() % 2 == 0) {
             headers["Sec-CH-UA"] = generate_sec_ch_ua();
             headers["Sec-CH-UA-Mobile"] = "?0";
             headers["Sec-CH-UA-Platform"] = generate_platform();
         }
+        
+        // FIXED: Houston timezone header
+        headers["X-Client-Timezone"] = "America/Chicago";
+        headers["X-Client-Location"] = "Houston, Texas";
         
         return headers;
     }
@@ -180,9 +257,9 @@ public:
     std::string generate_accept_language() const {
         static const std::vector<std::string> languages = {
             "en-US,en;q=0.9",
-            "en-US,en;q=0.8,es;q=0.6",
-            "en-GB,en;q=0.9",
-            "en-US,en;q=0.9,fr;q=0.8",
+            "en-US,en;q=0.8",
+            "en,en-US;q=0.9",
+            "en-US,en;q=0.7",
         };
         return languages[rand() % languages.size()];
     }
@@ -203,6 +280,14 @@ public:
     
     TLSFingerprint& get_tls_fingerprint() {
         return tls_fingerprint;
+    }
+    
+    LocationConfig get_location() const {
+        return location;
+    }
+    
+    json get_location_json() const {
+        return location.to_json();
     }
 };
 
@@ -240,6 +325,11 @@ public:
             return false;
         }
         
+        // Verify location before using proxy
+        if (!proxy->verify_location()) {
+            return false;
+        }
+        
         // Set proxy
         curl_easy_setopt(curl_handle, CURLOPT_PROXY, proxy->get_proxy_url().c_str());
         
@@ -259,7 +349,7 @@ public:
         
         curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, header_list);
         
-        // Disable HTTP/2 if needed for obfuscation
+        // Disable HTTP/2 for obfuscation
         curl_easy_setopt(curl_handle, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
         
         // Request timeout
@@ -281,7 +371,7 @@ public:
         if (!configure_anti_detection(user_agent)) {
             return json({
                 {"status", "error"},
-                {"message", "Invalid proxy or anti-detection configuration"}
+                {"message", "Invalid proxy or proxy location not Houston, Texas"}
             });
         }
         
@@ -313,6 +403,7 @@ public:
             {"status_code", response_code},
             {"body", response_body},
             {"proxy_ip", proxy->get_ip()},
+            {"proxy_location", proxy->get_location_json()},
             {"timestamp", time(nullptr)}
         });
     }
@@ -349,7 +440,15 @@ public:
         if (!proxy) {
             return json({
                 {"status", "error"},
-                {"message", "No active proxy connection available"}
+                {"message", "No active proxy connection available (Houston, Texas)"}
+            });
+        }
+        
+        // Verify location
+        if (!proxy->verify_location()) {
+            return json({
+                {"status", "error"},
+                {"message", "Proxy location is not Houston, Texas"}
             });
         }
         
@@ -362,7 +461,9 @@ public:
     json get_status() const {
         return json({
             {"active_connections", connection_pool.size()},
-            {"status", "running"}
+            {"status", "running"},
+            {"location", "Houston, Texas"},
+            {"location_fixed", true}
         });
     }
 };
@@ -371,6 +472,7 @@ public:
 class HandshakeProxyAPI {
 private:
     ProxyEngine engine;
+    LocationConfig location;
     
 public:
     HandshakeProxyAPI() {}
@@ -386,7 +488,10 @@ public:
             return json({
                 {"status", "success"},
                 {"message", "HandshakeProxy engine initialized"},
-                {"version", "1.0.0"}
+                {"version", "1.0.0"},
+                {"location", "Houston, Texas"},
+                {"location_fixed", true},
+                {"location_details", location.to_json()}
             });
         } catch (const std::exception& e) {
             return json({
@@ -422,7 +527,7 @@ extern "C" {
             static std::string response = result.dump();
             return response.c_str();
         } catch (const std::exception& e) {
-            static std::string error = std::string("{\"status\": \"error\", \"message\": \"" + std::string(e.what()) + "\"}");
+            static std::string error = std::string("{\"status\": \"error\", \"message\": \"") + e.what() + "\"}";
             return error.c_str();
         }
     }
@@ -433,7 +538,7 @@ extern "C" {
             static std::string response = result.dump();
             return response.c_str();
         } catch (const std::exception& e) {
-            static std::string error = std::string("{\"status\": \"error\", \"message\": \"" + std::string(e.what()) + "\"}");
+            static std::string error = std::string("{\"status\": \"error\", \"message\": \"") + e.what() + "\"}";
             return error.c_str();
         }
     }
@@ -444,7 +549,7 @@ extern "C" {
             static std::string response = result.dump();
             return response.c_str();
         } catch (const std::exception& e) {
-            static std::string error = std::string("{\"status\": \"error\", \"message\": \"" + std::string(e.what()) + "\"}");
+            static std::string error = std::string("{\"status\": \"error\", \"message\": \"") + e.what() + "\"}";
             return error.c_str();
         }
     }
